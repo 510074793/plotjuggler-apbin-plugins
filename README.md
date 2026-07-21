@@ -12,3 +12,5 @@ CI target: PlotJuggler tag `3.16.0` on GitHub's `macos-15` M1 runner.
 Build retry: use an isolated Python environment for Conan.
 
 Build retry: force the Qt 5 keg CMake package to avoid a stale system symlink.
+
+Build retry: pass the exact PlotJuggler CMake package directory to the plugin build.
