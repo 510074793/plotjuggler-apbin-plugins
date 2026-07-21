@@ -26,14 +26,13 @@ jobs:
         run: |
           set -euxo pipefail
           brew install cmake qt@5 protobuf mosquitto zeromq zstd git-lfs
-          python3 -m pip install --user conan
-          echo "$HOME/Library/Python/3.9/bin" >> "$GITHUB_PATH"
-          echo "$(python3 -m site --user-base)/bin" >> "$GITHUB_PATH"
+          python3 -m venv "$RUNNER_TEMP/conan-venv"
+          "$RUNNER_TEMP/conan-venv/bin/pip" install conan
+          echo "$RUNNER_TEMP/conan-venv/bin" >> "$GITHUB_PATH"
 
       - name: Prepare Conan
         run: |
           set -euxo pipefail
-          export PATH="$(python3 -m site --user-base)/bin:$PATH"
           conan --version
           conan profile detect --force
 
@@ -48,7 +47,6 @@ jobs:
       - name: Build and install PlotJuggler 3.16.0
         run: |
           set -euxo pipefail
-          export PATH="$(python3 -m site --user-base)/bin:$PATH"
           export CMAKE_PREFIX_PATH="$(brew --prefix qt@5)"
           conan install PlotJuggler -of pj-build --build=missing -pr:b=default -s build_type=Release -s compiler.cppstd=17
           cmake --preset conan-release -S PlotJuggler -B pj-build             -DPJ_INSTALLATION=macos             -DCMAKE_INSTALL_PREFIX="$PWD/pj-install"
