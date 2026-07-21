@@ -77,6 +77,12 @@ jobs:
           test -n "$PLUGIN"
           file "$PLUGIN"
           file "$PLUGIN" | grep -q arm64
+          QT_PREFIX="$(brew --prefix qt@5)"
+          for FRAMEWORK in QtConcurrent QtXml QtSvg QtWidgets QtGui QtCore; do
+            install_name_tool -change               "$QT_PREFIX/lib/$FRAMEWORK.framework/Versions/5/$FRAMEWORK"               "@rpath/$FRAMEWORK.framework/Versions/5/$FRAMEWORK"               "$PLUGIN"
+          done
+          /usr/bin/codesign --force --sign - "$PLUGIN"
+          ! otool -L "$PLUGIN" | grep -q "/opt/homebrew"
           otool -L "$PLUGIN"
 
       - name: Package standalone plugin
