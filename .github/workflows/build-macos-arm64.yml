@@ -1,0 +1,147 @@
+name: Build PlotJuggler 3.16 DataAPBin for macOS arm64
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: macos-15
+    timeout-minutes: 90
+
+    steps:
+      - name: Confirm Apple Silicon runner
+        run: |
+          set -euxo pipefail
+          uname -a
+          test "$(uname -m)" = "arm64"
+
+      - name: Install build dependencies
+        run: |
+          set -euxo pipefail
+          brew install cmake qt@5 protobuf mosquitto zeromq zstd git-lfs
+          python3 -m pip install --user conan
+          echo "$HOME/Library/Python/3.9/bin" >> "$GITHUB_PATH"
+          echo "$(python3 -m site --user-base)/bin" >> "$GITHUB_PATH"
+
+      - name: Prepare Conan
+        run: |
+          set -euxo pipefail
+          export PATH="$(python3 -m site --user-base)/bin:$PATH"
+          conan --version
+          conan profile detect --force
+
+      - name: Fetch PlotJuggler 3.16.0 and ArduPilot plugin
+        run: |
+          set -euxo pipefail
+          git clone --branch 3.16.0 --depth 1 https://github.com/PlotJuggler/PlotJuggler.git PlotJuggler
+          git clone --depth 1 https://github.com/ArduPilot/plotjuggler-apbin-plugins.git apbin-plugin
+          git -C PlotJuggler rev-parse HEAD
+          git -C apbin-plugin rev-parse HEAD
+
+      - name: Build and install PlotJuggler 3.16.0
+        run: |
+          set -euxo pipefail
+          export PATH="$(python3 -m site --user-base)/bin:$PATH"
+          export CMAKE_PREFIX_PATH="$(brew --prefix qt@5)"
+          conan install PlotJuggler -of pj-build --build=missing -pr:b=default -s build_type=Release -s compiler.cppstd=17
+          cmake --preset conan-release -S PlotJuggler -B pj-build             -DPJ_INSTALLATION=macos             -DCMAKE_INSTALL_PREFIX="$PWD/pj-install"
+          cmake --build pj-build --config Release --target install -j3
+
+      - name: Build DataAPBin plugin
+        run: |
+          set -euxo pipefail
+          export CMAKE_PREFIX_PATH="$PWD/pj-install;$(brew --prefix qt@5)"
+          cmake -S apbin-plugin -B apbin-build             -DCMAKE_BUILD_TYPE=Release             -DCMAKE_OSX_ARCHITECTURES=arm64             -DCMAKE_INSTALL_PREFIX="$PWD/apbin-install"
+          cmake --build apbin-build --config Release --target install -j3
+          PLUGIN="$(find apbin-install -type f -name 'libDataAPBin.dylib' -print -quit)"
+          test -n "$PLUGIN"
+          file "$PLUGIN"
+          file "$PLUGIN" | grep -q arm64
+          otool -L "$PLUGIN"
+
+      - name: Package standalone plugin
+        run: |
+          set -euxo pipefail
+          mkdir -p dist/plugin
+          PLUGIN="$(find apbin-install -type f -name 'libDataAPBin.dylib' -print -quit)"
+          cp "$PLUGIN" dist/plugin/
+          cp apbin-plugin/LICENSE dist/plugin/LICENSE-ArduPilot-plugin.txt
+          {
+            echo "DataAPBin plugin for PlotJuggler 3.16.0"
+            echo "Platform: macOS Apple Silicon arm64"
+            echo "Build architecture:"
+            file "$PLUGIN"
+            echo
+            echo "Install:"
+            echo "1. In PlotJuggler open App -> Preferences -> Plugins."
+            echo "2. Add the folder containing libDataAPBin.dylib."
+            echo "3. Restart PlotJuggler and open an ArduPilot .BIN log."
+            echo
+            echo "If Gatekeeper blocks this unsigned community build:"
+            echo "xattr -dr com.apple.quarantine /path/to/libDataAPBin.dylib"
+          } > dist/plugin/README.txt
+          otool -L "$PLUGIN" > dist/plugin/otool-dependencies.txt
+          ditto -c -k --sequesterRsrc --keepParent dist/plugin             DataAPBin-PlotJuggler-3.16.0-macOS-arm64.zip
+
+      - name: Assemble PlotJuggler app with DataAPBin
+        run: |
+          set -euxo pipefail
+          APP="dist/PlotJuggler.app"
+          mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
+          cp -R pj-build/bin/. "$APP/Contents/MacOS/"
+          PLUGIN="$(find apbin-install -type f -name 'libDataAPBin.dylib' -print -quit)"
+          cp "$PLUGIN" "$APP/Contents/MacOS/"
+          cp PlotJuggler/plotjuggler.png "$APP/Contents/Resources/plotjuggler.png"
+          cat > "$APP/Contents/Info.plist" <<'PLIST'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>CFBundleExecutable</key>
+            <string>plotjuggler</string>
+            <key>CFBundleIdentifier</key>
+            <string>io.plotjuggler.application.apbin</string>
+            <key>CFBundleName</key>
+            <string>PlotJuggler</string>
+            <key>CFBundleVersion</key>
+            <string>3.16.0</string>
+            <key>CFBundleShortVersionString</key>
+            <string>3.16.0</string>
+            <key>CFBundlePackageType</key>
+            <string>APPL</string>
+            <key>CFBundleIconFile</key>
+            <string>plotjuggler.png</string>
+            <key>LSMinimumSystemVersion</key>
+            <string>11.0</string>
+            <key>NSHighResolutionCapable</key>
+            <true/>
+          </dict>
+          </plist>
+          PLIST
+          export PATH="$(brew --prefix qt@5)/bin:$PATH"
+          macdeployqt "$APP" -verbose=2
+          /usr/bin/codesign --force --deep --sign - "$APP"
+          /usr/bin/codesign --verify --deep --strict --verbose=2 "$APP"
+          file "$APP/Contents/MacOS/plotjuggler" | grep -q arm64
+          file "$APP/Contents/MacOS/libDataAPBin.dylib" | grep -q arm64
+          ditto -c -k --sequesterRsrc --keepParent "$APP"             PlotJuggler-3.16.0-with-DataAPBin-macOS-arm64.zip
+
+      - name: Write checksums
+        run: |
+          shasum -a 256             DataAPBin-PlotJuggler-3.16.0-macOS-arm64.zip             PlotJuggler-3.16.0-with-DataAPBin-macOS-arm64.zip             | tee SHA256SUMS.txt
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: PlotJuggler-3.16.0-DataAPBin-macOS-arm64
+          if-no-files-found: error
+          retention-days: 30
+          path: |
+            DataAPBin-PlotJuggler-3.16.0-macOS-arm64.zip
+            PlotJuggler-3.16.0-with-DataAPBin-macOS-arm64.zip
+            SHA256SUMS.txt
