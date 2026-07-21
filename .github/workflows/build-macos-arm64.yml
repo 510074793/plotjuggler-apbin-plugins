@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build:
@@ -166,3 +166,40 @@ jobs:
             DataAPBin-PlotJuggler-3.16.0-macOS-arm64.zip
             PlotJuggler-3.16.0-with-DataAPBin-macOS-arm64.zip
             SHA256SUMS.txt
+
+      - name: Publish GitHub Release
+        if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && startsWith(github.event.head_commit.message, 'Release '))
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: v3.16.0-dataapbin-macos-arm64
+        run: |
+          set -euxo pipefail
+          cat > release-notes.md <<'NOTES'
+          PlotJuggler 3.16.0 with the ArduPilot DataAPBin plugin for Apple Silicon Macs.
+
+          Downloads:
+          - PlotJuggler-3.16.0-with-DataAPBin-macOS-arm64.zip — complete application (recommended)
+          - DataAPBin-PlotJuggler-3.16.0-macOS-arm64.zip — standalone plugin
+          - SHA256SUMS.txt — integrity checksums
+
+          Notes:
+          - Architecture: macOS arm64 (Apple M1/M2/M3/M4 and later Apple Silicon)
+          - The application is ad-hoc signed but not Apple-notarized.
+          - If macOS blocks it, run:
+            xattr -dr com.apple.quarantine /Applications/PlotJuggler.app
+          NOTES
+          FILES=(
+            DataAPBin-PlotJuggler-3.16.0-macOS-arm64.zip
+            PlotJuggler-3.16.0-with-DataAPBin-macOS-arm64.zip
+            SHA256SUMS.txt
+          )
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            gh release upload "$RELEASE_TAG" "${FILES[@]}" --clobber
+            gh release edit "$RELEASE_TAG" --title "PlotJuggler 3.16.0 + DataAPBin for macOS arm64" --notes-file release-notes.md
+          else
+            gh release create "$RELEASE_TAG" "${FILES[@]}" \
+              --target "$GITHUB_SHA" \
+              --title "PlotJuggler 3.16.0 + DataAPBin for macOS arm64" \
+              --notes-file release-notes.md
+          fi
+
