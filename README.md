@@ -10,3 +10,5 @@ Build outputs are unsigned community artifacts. See the workflow artifact README
 CI target: PlotJuggler tag `3.16.0` on GitHub's `macos-15` M1 runner.
 
 Build retry: use an isolated Python environment for Conan.
+
+Build retry: force the Qt 5 keg CMake package to avoid a stale system symlink.
