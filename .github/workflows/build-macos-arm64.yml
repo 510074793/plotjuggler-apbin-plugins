@@ -3,6 +3,8 @@ name: Build PlotJuggler 3.16 DataAPBin for macOS arm64
 on:
   push:
     branches: [main]
+  pull_request:
+    branches: [main]
   workflow_dispatch:
 
 permissions:
