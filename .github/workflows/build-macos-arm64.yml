@@ -50,6 +50,14 @@ jobs:
           git -C PlotJuggler rev-parse HEAD
           git -C apbin-plugin rev-parse HEAD
 
+      - name: Cache PlotJuggler build tree
+        uses: actions/cache@v4
+        with:
+          path: |
+            pj-build
+            pj-install
+          key: pj-build-macos-arm64-3.16.0-v1
+
       - name: Build and install PlotJuggler 3.16.0
         run: |
           set -euxo pipefail
@@ -62,6 +70,7 @@ jobs:
         run: |
           set -euxo pipefail
           export CMAKE_PREFIX_PATH="$PWD/pj-install;$(brew --prefix qt@5)"
+          export LDFLAGS="-L$PWD/pj-install/lib -L$(brew --prefix qt@5)/lib"
           cmake -S apbin-plugin -B apbin-build             -DCMAKE_BUILD_TYPE=Release             -DCMAKE_OSX_ARCHITECTURES=arm64             -DQt5_DIR="$(brew --prefix qt@5)/lib/cmake/Qt5"             -Dplotjuggler_DIR="$PWD/pj-install/lib/cmake/plotjuggler"             -DCMAKE_INSTALL_PREFIX="$PWD/apbin-install"
           cmake --build apbin-build --config Release --target install -j3
           PLUGIN="$(find apbin-install -type f -name 'libDataAPBin.dylib' -print -quit)"
