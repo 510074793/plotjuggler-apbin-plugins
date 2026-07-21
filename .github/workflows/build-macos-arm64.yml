@@ -30,6 +30,12 @@ jobs:
           "$RUNNER_TEMP/conan-venv/bin/pip" install conan
           echo "$RUNNER_TEMP/conan-venv/bin" >> "$GITHUB_PATH"
 
+      - name: Cache Conan packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.conan2
+          key: conan-macos-arm64-plotjuggler-3.16.0-v1
+
       - name: Prepare Conan
         run: |
           set -euxo pipefail
@@ -56,7 +62,7 @@ jobs:
         run: |
           set -euxo pipefail
           export CMAKE_PREFIX_PATH="$PWD/pj-install;$(brew --prefix qt@5)"
-          cmake -S apbin-plugin -B apbin-build             -DCMAKE_BUILD_TYPE=Release             -DCMAKE_OSX_ARCHITECTURES=arm64             -DCMAKE_INSTALL_PREFIX="$PWD/apbin-install"
+          cmake -S apbin-plugin -B apbin-build             -DCMAKE_BUILD_TYPE=Release             -DCMAKE_OSX_ARCHITECTURES=arm64             -DQt5_DIR="$(brew --prefix qt@5)/lib/cmake/Qt5"             -DCMAKE_INSTALL_PREFIX="$PWD/apbin-install"
           cmake --build apbin-build --config Release --target install -j3
           PLUGIN="$(find apbin-install -type f -name 'libDataAPBin.dylib' -print -quit)"
           test -n "$PLUGIN"
