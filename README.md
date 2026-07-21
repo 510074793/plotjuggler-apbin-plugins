@@ -6,3 +6,5 @@ This repository uses GitHub Actions on an Apple Silicon macOS runner to build:
 - a self-contained PlotJuggler 3.16.0 app bundle with the plugin installed.
 
 Build outputs are unsigned community artifacts. See the workflow artifact README for installation details.
+
+CI target: PlotJuggler tag `3.16.0` on GitHub's `macos-15` M1 runner.
