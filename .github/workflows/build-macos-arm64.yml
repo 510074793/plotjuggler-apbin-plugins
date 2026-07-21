@@ -193,11 +193,12 @@ jobs:
             PlotJuggler-3.16.0-with-DataAPBin-macOS-arm64.zip
             SHA256SUMS.txt
           )
-          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
-            gh release upload "$RELEASE_TAG" "${FILES[@]}" --clobber
-            gh release edit "$RELEASE_TAG" --title "PlotJuggler 3.16.0 + DataAPBin for macOS arm64" --notes-file release-notes.md
+          if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$RELEASE_TAG" "${FILES[@]}" --clobber --repo "$GITHUB_REPOSITORY"
+            gh release edit "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --title "PlotJuggler 3.16.0 + DataAPBin for macOS arm64" --notes-file release-notes.md
           else
             gh release create "$RELEASE_TAG" "${FILES[@]}" \
+              --repo "$GITHUB_REPOSITORY" \
               --target "$GITHUB_SHA" \
               --title "PlotJuggler 3.16.0 + DataAPBin for macOS arm64" \
               --notes-file release-notes.md
