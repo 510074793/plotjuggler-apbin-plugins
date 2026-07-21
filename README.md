@@ -14,3 +14,5 @@ Build retry: use an isolated Python environment for Conan.
 Build retry: force the Qt 5 keg CMake package to avoid a stale system symlink.
 
 Build retry: pass the exact PlotJuggler CMake package directory to the plugin build.
+
+Build retry: add the installed PlotJuggler library directory to the macOS linker search path.
